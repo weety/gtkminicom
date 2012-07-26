@@ -1,2 +1,4 @@
 *.o
 gtkminicom
+.sconsign.dblite
+config.pyc
