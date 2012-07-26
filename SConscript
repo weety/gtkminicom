@@ -3,15 +3,15 @@ from SCons.Script import *
 
 Import('env')
 
-inc_path = ['./']
+inc_path = ['./include']
 
 src = Split("""
-gtkminicom.c
-window.c
-serialconfigdialog.c
-serial.c
-logfile.c
-trayicon.c
+src/gtkminicom.c
+src/window.c
+src/serialconfigdialog.c
+src/serial.c
+src/logfile.c
+src/trayicon.c
 """)
 
 env.Append(CPPPATH = inc_path)
