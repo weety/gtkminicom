@@ -1,0 +1,14 @@
+#!/usr/bin/env xdg-open
+
+[Desktop Entry]
+Name=gtkminicom
+Name[zh_CN]=gtkminicom
+GenericName[zh_CN]=串口超级终端
+Comment=systes test
+Comment[zh_CN]=基于gtk+的超级终端
+Exec=/home/arm/mywork/gtk-program/gtkminicom/v0.5/gtkminicom %F
+Icon=/home/arm/mywork/gtk-program/gtkminicom/v0.5/icon.png
+Terminal=false
+X-MultipleArgs=false
+Type=Application
+Categories=GNOME;GTK;Development;
