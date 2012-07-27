@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/signal.h> 
+//#include <sys/signal.h> 
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <fcntl.h>
@@ -18,8 +18,7 @@
 #include "list.h"
 
 #define G_THREAD_FUNC(f) ((GThreadFunc) (f))
-#define _POSIX_SOURCE 1 /* POSIX compliant source */ 
-//static gboolean read_thread_loop = TRUE;    
+#define _POSIX_SOURCE 1 /* POSIX compliant source */  
 static GThread *serial_read_thread = NULL;
 
 static gchar buf[1024];
@@ -27,12 +26,7 @@ static gchar buf[1024];
 static gint serial_fd = -1;
 //struct termios oldtio;
 static struct termios options;
-static struct sigaction saio; 
-static volatile int STOP=FALSE;
-static void signal_handler_IO (int status);   /* definition of signal handler */  
-                                     // 定义信号处理程序
-static int wait_flag=TRUE;                   /* TRUE while no signal received */     
-                                    // TRUE 代表没有受到信号，正在等待中  
+static volatile int thread_should_exit = FALSE;
 
 #define NAME_LEN    32
 struct callback_func_list
@@ -45,22 +39,9 @@ struct callback_func_list
 static struct list_head callback_head= LIST_HEAD_INIT(callback_head);
 
 
-/***************************************************************************    
- * signal handler. sets wait_flag to FALSE, to indicate above loop that    *
- * characters have been received.                                          * 
-***************************************************************************/   
-
-// 信号处理函数，设置 wait_flag 为 FALSE, 以告知上面的循环函数串口收到字符了  
-void signal_handler_IO (int status)  
-{   
-	// printf("received SIGIO signal.\n");     
-	wait_flag = FALSE;  
-}
-
-
 gboolean OpenDev(gchar *Dev)
 {
-	serial_fd = open( Dev, O_RDWR | O_NOCTTY | O_NDELAY );
+	serial_fd = open( Dev, O_RDWR );
 	//| O_NOCTTY | O_NDELAY|O_NONBLOCK
 	if (-1 == serial_fd)
 	{
@@ -73,21 +54,7 @@ gboolean OpenDev(gchar *Dev)
 		printf("standard input is not a terminal device\n");
 	else
 		printf("isatty success!\n");
-	/* install the signal handler before making the device asynchronous */    
- 	// 在进行设备异步传输前，安装信号处理程序    
-	saio.sa_handler = signal_handler_IO;     
-	//saio.sa_mask = 0;  
-	saio.sa_flags = 0;     
-	saio.sa_restorer = NULL;    
-	sigaction(SIGIO,&saio,NULL);   
 
-	/* allow the process to receive SIGIO */ 
-	// 允许进程接收 SIGIO 信号      
-	fcntl(serial_fd, F_SETOWN, getpid());    
-	/* Make the file descriptor asynchronous (the manual page says only  
-	O_APPEND and O_NONBLOCK, will work with F_SETFL...) */   
-	// 设置串口的文件描述符为异步，man上说，只有 O_APPEND 和 O_NONBLOCK 才能使用F_SETFL
-	fcntl(serial_fd, F_SETFL, FASYNC);  
 	if ( tcgetattr( serial_fd, &options) != 0)
 	{
 		perror("SetupSerial 1");
@@ -100,25 +67,11 @@ gboolean OpenDev(gchar *Dev)
 	options.c_oflag &=~(ONLCR|OCRNL);
 	options.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);////////重要
 	// options.c_cc[VMIN]=1;  
-	options.c_cc[VMIN]=0;    
+//	options.c_cc[VMIN]=0;    
 	// options.c_cc[VTIME]=0;
-	options.c_cc[VTIME]=2;
+//	options.c_cc[VTIME]=2;
 	tcflush(serial_fd, TCIFLUSH);  
-#if 0
-	home = getenv("HOME");
-	printf("home=%s\n",home);
-	get_time(time, sizeof(time));
-	//sprintf(filepath, "%s/gtkminicom.%s.log", home, time);
-	sprintf(filepath, "/tmp/gtkminicom.log");
-	printf("%s\n",filepath);
-	//logfilefd = fopen(filepath, "w");  //记录日志文件
-	logfilefd = fopen(filepath, "a");  //记录日志文件
-	fprintf(logfilefd, "\n\n");
-	fprintf(logfilefd, "/********************************************/\n");
-	fprintf(logfilefd, "/******    %s    ******/\n", time);
-	fprintf(logfilefd, "/********************************************/\n");
-	fprintf(logfilefd, "\n\n");
-#endif
+
 	return TRUE;
 }
 
@@ -220,13 +173,13 @@ gboolean set_speed(gint speed)
 gboolean set_term(gint databits,gint stopbits,gchar parity,gint bps)
 {
 	//options.c_cflag &= ~CSIZE;
-	if(set_databits(databits)==FALSE)
+	if(set_databits(databits) == FALSE)
 		return (FALSE);
-	if(set_parity(parity)==FALSE)
+	if(set_parity(parity) == FALSE)
 		return (FALSE);
-	if(set_stopbits(stopbits)==FALSE)
+	if(set_stopbits(stopbits) == FALSE)
 		return (FALSE);
-	if(set_speed(bps)==FALSE)
+	if(set_speed(bps) == FALSE)
 		return (FALSE);
 	/* Set input parity option */
 	// if (parity != 'n')
@@ -249,12 +202,12 @@ gboolean set_serial_init(gchar *device,gint baud_num,gint veri_num,gint data_num
 	gint data_bit[] = {5,6,7,8};
 	gint stop_bit[] = {1,2};
 
-	if(OpenDev(device)==FALSE)
+	if(OpenDev(device) == FALSE)
 		return (FALSE);
 	if(set_term(data_bit[data_num],
 			stop_bit[stop_num],
 			verify_arr[veri_num],
-			speed_arr[baud_num])==FALSE)
+			speed_arr[baud_num]) == FALSE)
 	{
 		g_print("set the serial error!\n");
 		return (FALSE);
@@ -268,10 +221,10 @@ void send_serial(gchar *text, guint length)
 {
 	int num;
 	//printf("write serial\n");
-	if(serial_fd>0)
+	if(serial_fd > 0)
 	{
-		num=write(serial_fd, text, length);
-		if(num<=0)
+		num = write(serial_fd, text, length);
+		if(num <= 0)
 		{
 			printf("write serial error\n");
 		}
@@ -291,7 +244,6 @@ void close_serial()
 }
 
 
-//void  read_thread(VteTerminal *display)
 void  read_thread(void)
 {
 	glong res, res_tmp; 
@@ -302,38 +254,42 @@ void  read_thread(void)
 	gchar time[32];
 	struct list_head *plist;
 	struct callback_func_list *callback_node;
-	//FILE *file;
-	//file = fopen("test.data", "w");
-	//  serial_fd_set readset;
-	//  struct timeval tv;
-	//  gint Maxserial_fd=0;
-	//  int ret;
-	//  Maxserial_fd=serial_fd+1;
-	//gchar *dbuf;
-	//glong dlong;
-	// glong length;
-	// while (STOP==FALSE)
+	struct timeval select_timeout;
+	fd_set rset;
+	int status = 0;
+	
+	select_timeout.tv_sec = 1;
+	select_timeout.tv_usec = 0;
+
 	while (1)
 	{       
 		usleep(1000);  
 		//gdk_threads_enter();
-		if(serial_fd<=0)
+		if (thread_should_exit == TRUE)
 		{
 			printf("线程退出\n");
 			g_thread_exit(NULL);
 		}
 
-		//   ioctl(serial_fd, FIONREAD, &len);
-		/* after receiving SIGIO, wait_flag = FALSE, input is availableand can be read */
-		// 在收到 SIGIO 信号后，wait_flag = FALSE, 表示有输入进来，可以读取了 
-		if (wait_flag==FALSE) 
-		//  if (len>0) 
+		FD_ZERO(&rset);
+		FD_SET(serial_fd, &rset);
+		status = select(serial_fd + 1, &rset, NULL, NULL, &select_timeout);
+		if(status == 0)
+		{
+			continue;
+		}
+		else if(status < 0)
+		{
+			perror("select error\n");
+			continue;
+		}
+		
+		if (FD_ISSET(serial_fd, &rset))
 		{         
-			wait_flag = TRUE;      /* wait for new input 等待新的输入*/ 
 			ioctl(serial_fd, FIONREAD, &len);
 			if (len > 1024) 
 			{
-				printf("len=%d\n", len);
+				printf("len=%ld\n", len);
 				len = 1024;
 			}
 			get_time(time, sizeof(time));
@@ -380,7 +336,6 @@ void  read_thread(void)
 				}
 			}
 
-//			wait_flag = TRUE;      /* wait for new input 等待新的输入*/   
 		}   
 		//gdk_threads_leave();   
 	}       
@@ -391,6 +346,7 @@ void  read_thread(void)
 /*创建串口读线程*/
 void serial_read_thread_create(void)
 {
+	thread_should_exit = FALSE;
 	serial_read_thread = g_thread_create(G_THREAD_FUNC(read_thread),NULL,TRUE,NULL);//创建线程
 	//serial_read_thread = g_thread_create(G_THREAD_FUNC(read_thread),display,TRUE,NULL);//创建线程
 	
@@ -401,11 +357,10 @@ void serial_read_thread_exit(void)
 {
 	if(serial_read_thread!=NULL)
 	{
-		//read_thread_loop = FALSE;
-		close_serial();
+		thread_should_exit = TRUE;
 		g_thread_join(serial_read_thread);
+		close_serial();
 		serial_read_thread = NULL;
-		//close_serial();
 	}
 }
 
