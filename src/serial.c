@@ -258,8 +258,10 @@ void  read_thread(void)
 	fd_set rset;
 	int status = 0;
 	
-	select_timeout.tv_sec = 1;
-	select_timeout.tv_usec = 0;
+	//select_timeout.tv_sec = 1;
+	//select_timeout.tv_usec = 0;
+	FD_ZERO(&rset);
+	FD_SET(serial_fd, &rset);
 
 	while (1)
 	{       
@@ -273,6 +275,8 @@ void  read_thread(void)
 
 		FD_ZERO(&rset);
 		FD_SET(serial_fd, &rset);
+		select_timeout.tv_sec = 1;
+		select_timeout.tv_usec = 0;
 		status = select(serial_fd + 1, &rset, NULL, NULL, &select_timeout);
 		if(status == 0)
 		{
