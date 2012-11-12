@@ -534,6 +534,9 @@ GtkWidget *create_main_window(void)
 	gtk_widget_show (toolbar);
 	gtk_widget_show (display);
 	gtk_widget_show (scrolledwindow);
+	gtk_widget_set_can_default (display, TRUE);
+	gtk_widget_grab_default (display);
+	gtk_widget_grab_focus (display);
 	//gtk_builder_connect_signals (builder, NULL); 
 	//g_object_unref (G_OBJECT (builder));
 	
