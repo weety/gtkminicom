@@ -117,6 +117,14 @@ void create_serialconfig_dialog(void)
 			gtk_combo_box_append_text (GTK_COMBO_BOX(serial_number),device);
 		}
 	}
+	for(i=0; i<MAX_SERIAL_DEVICE; i++)
+	{
+		sprintf(device,"/dev/ttyACM%d",i);
+		if(stat(device, &dev_stat) == 0)
+		{
+			gtk_combo_box_append_text (GTK_COMBO_BOX(serial_number),device);
+		}
+	}
 	//gtk_combo_box_append_text (GTK_COMBO_BOX(serial_number),"/dev/ttyS0");
 	//gtk_combo_box_append_text (GTK_COMBO_BOX(serial_number),"/dev/ttyS1");
 	//gtk_combo_box_append_text (GTK_COMBO_BOX(serial_number),"/dev/ttyS2");
